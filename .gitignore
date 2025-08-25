@@ -1,0 +1,30 @@
+# --- Node / package managers ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Build / cache ---
+dist/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# --- Environment files (keep secrets out of git) ---
+.env
+.env.local
+.env.*.local
+
+# --- Editor / OS cruft ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+.history/
+
+# --- Logs ---
+*.log
