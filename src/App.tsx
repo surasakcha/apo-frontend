@@ -203,8 +203,8 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-800">
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Database className="w-5 h-5 text-slate-600"/><h1 className="text-base font-semibold">A-PO Current Process Gatherer – Prototype</h1>
-          <Pill>Local-first (IndexedDB)</Pill>{API_BASE && <Pill>Cloud sync ON</Pill>}{dirty && <Pill>Unsaved changes</Pill>}
+          <Database className="w-5 h-5 text-slate-600"/><h1 className="text-base font-semibold">APO - Process Gathering</h1>
+          {API_BASE && <Pill>Cloud sync ON</Pill>}{dirty && <Pill>Unsaved changes</Pill>}
           <div className="ml-auto flex items-center gap-2">
             <ToolbarButton icon={RotateCcw} label="Undo" onClick={undo} disabled={history.length===0}/>
             <ToolbarButton icon={RotateCw} label="Redo" onClick={redo} disabled={future.length===0}/>
