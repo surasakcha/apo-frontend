@@ -99,7 +99,7 @@ export default function App() {
     try{
       await db.transaction('rw', db.processes, db.steps, async()=>{
         await db.processes.update(activeId, { updatedAt: nowISO() })
-        for(const s of steps){ if(s.id){ await db.steps.update(s.id, s) } else { const id = await db.steps.add({...s}); s.id=id } }
+        for(const s of steps){ if(s.id){ await db.steps.put(s) } else { const id = await db.steps.add({...s}); s.id=id } }
         const ids = steps.filter(s=>s.id).map(s=>s.id!) as number[]
         const toDelete = await db.steps.where({processId:activeId}).toArray()
         for(const row of toDelete) if(!ids.includes(row.id!)) await db.steps.delete(row.id!)
