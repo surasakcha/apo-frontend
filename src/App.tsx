@@ -99,14 +99,7 @@ export default function App() {
     try{
       await db.transaction('rw', db.processes, db.steps, async()=>{
         await db.processes.update(activeId, { updatedAt: nowISO() })
-        for(const s of steps){
-          if(s.id){
-            await db.steps.put(s)
-          } else {
-            const id = await db.steps.add({ ...s })
-            s.id = id
-          }
-        }
+        for(const s of steps){ if(s.id){ await db.steps.update(s.id, s) } else { const id = await db.steps.add({...s}); s.id=id } }
         const ids = steps.filter(s=>s.id).map(s=>s.id!) as number[]
         const toDelete = await db.steps.where({processId:activeId}).toArray()
         for(const row of toDelete) if(!ids.includes(row.id!)) await db.steps.delete(row.id!)
@@ -131,7 +124,7 @@ export default function App() {
   function exportProcess(){ if(!activeId) return; (async()=>{
     const proc=await db.processes.get(activeId); const s=await db.steps.where({processId:activeId}).sortBy('index'); const arts=await db.artifacts.where({processId:activeId}).toArray()
     const data={ process:proc, steps:s, artifacts: arts.map(a=>({ ...a, blob: undefined })) }
-    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`${(proc?.name||'process').replace(/\\s+/g,'_')}.apo.json`; a.click(); URL.revokeObjectURL(url)
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`${(proc?.name||'process').replace(/\s+/g,'_')}.apo.json`; a.click(); URL.revokeObjectURL(url)
   })() }
 
   function importProcess(file:File){ (async()=>{
