@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Plus, Save, Upload, Trash2, ArrowUp, ArrowDown, Download, FileText, Database, PlayCircle, Import, Link2, CheckCircle2, XCircle, MoveRight, GitCommit, Settings2 } from 'lucide-react'
+import { Plus, Save, Upload, Trash2, ArrowUp, ArrowDown, Download, FileText, Database, PlayCircle, Import, Link2, CheckCircle2, XCircle, MoveRight, GitCommit, Settings2, RotateCcw, RotateCw } from 'lucide-react'
 import { Pill, SectionTitle, ToolbarButton, TextInput, TextArea, Select, ChipInput, DropZone, ArtifactItem } from './components'
 import { db, DEFAULT_FREQUENCIES, type ArtifactRow, type ArtifactKind, type ProcessRow, type StepRow } from './db'
 import { API_BASE, apiCreateProcess, apiUpdateProcess, apiPutSteps } from './lib/api'
@@ -14,13 +14,60 @@ export default function App() {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // --- Undo/Redo state & helpers ---
+  const [history, setHistory] = useState<StepRow[][]>([])
+  const [future, setFuture] = useState<StepRow[][]>([])
+  const MAX_HISTORY = 50
+
+  const snapshotSteps = (arr: StepRow[]) => arr.map(s => ({ ...s }))
+
+  function pushHistory() {
+    setHistory(h => [snapshotSteps(steps), ...h].slice(0, MAX_HISTORY))
+    setFuture([]) // clear redo after a new action
+  }
+
+  function undo() {
+    if (!history.length) return
+    const prev = history[0]
+    setFuture(f => [snapshotSteps(steps), ...f])
+    setHistory(h => h.slice(1))
+    setSteps(prev)
+    markDirty()
+  }
+
+  function redo() {
+    if (!future.length) return
+    const next = future[0]
+    setHistory(h => [snapshotSteps(steps), ...h].slice(0, MAX_HISTORY))
+    setFuture(f => f.slice(1))
+    setSteps(next)
+    markDirty()
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [history, future, steps])
+  // --- end Undo/Redo ---
+
   useEffect(()=>{ (async()=>{ const list=await db.processes.orderBy('updatedAt').reverse().toArray(); setProcesses(list); if(list.length) setActiveId(list[0].id) })() }, [])
   useEffect(()=>{
-    if(!activeId){ setSteps([]); setArtifactsByStep({}); return }
+    if(!activeId){ setSteps([]); setArtifactsByStep({}); setHistory([]); setFuture([]); return }
     (async()=>{
-      const s=await db.steps.where({processId:activeId}).sortBy('index'); setSteps(s)
-      const grouped:Record<number,ArtifactRow[]>= {}; const arts=await db.artifacts.where({processId:activeId}).toArray()
-      for(const a of arts){ if(!grouped[a.stepId]) grouped[a.stepId]=[]; grouped[a.stepId].push(a) } setArtifactsByStep(grouped)
+      const s=await db.steps.where({processId:activeId}).sortBy('index');
+      setSteps(s)
+      setHistory([]); setFuture([])
+      const grouped:Record<number,ArtifactRow[]>= {};
+      const arts=await db.artifacts.where({processId:activeId}).toArray()
+      for(const a of arts){ if(!grouped[a.stepId]) grouped[a.stepId]=[]; grouped[a.stepId].push(a) }
+      setArtifactsByStep(grouped)
     })()
   }, [activeId])
 
@@ -53,12 +100,14 @@ export default function App() {
 
   function addStep(){
     if(!activeId) return
+    pushHistory()
     const idx = steps.length
     const newStep: StepRow = { processId: activeId, index: idx, who:'', action:'', tools:[], details:'', frequency:'', outcome:'', duration:'', nextType:'end', nextRef: undefined, isEnd: idx === 0 }
     setSteps(prev=>[...prev,newStep]); markDirty()
   }
 
   function updateStep(i:number, patch: Partial<StepRow>){
+    pushHistory()
     const copy = steps.slice(); copy[i] = { ...copy[i], ...patch }
     if((patch as any).isEnd){ for(let k=0;k<copy.length;k++) if(k!==i) copy[k].isEnd=false; copy[i].nextType='end'; copy[i].nextRef=undefined }
     setSteps(copy); markDirty()
@@ -66,12 +115,14 @@ export default function App() {
 
   function moveStep(i:number, dir:-1|1){
     const j=i+dir; if(j<0||j>=steps.length) return
+    pushHistory()
     const r=steps.slice(); const tmp=r[i]; r[i]=r[j]; r[j]=tmp; const withIndex=r.map((s,idx)=>({...s,index:idx}))
     setSteps(withIndex); markDirty()
   }
 
   function removeStep(i:number){
     const step=steps[i]; if(step?.id && artifactsByStep[step.id]?.length){ if(!confirm('This step has artifacts. Delete anyway?')) return }
+    pushHistory()
     const filtered=steps.filter((_,idx)=>idx!==i).map((s,idx)=>({...s,index:idx})); setSteps(filtered); markDirty()
   }
 
@@ -155,6 +206,8 @@ export default function App() {
           <Database className="w-5 h-5 text-slate-600"/><h1 className="text-base font-semibold">A-PO Current Process Gatherer – Prototype</h1>
           <Pill>Local-first (IndexedDB)</Pill>{API_BASE && <Pill>Cloud sync ON</Pill>}{dirty && <Pill>Unsaved changes</Pill>}
           <div className="ml-auto flex items-center gap-2">
+            <ToolbarButton icon={RotateCcw} label="Undo" onClick={undo} disabled={history.length===0}/>
+            <ToolbarButton icon={RotateCw} label="Redo" onClick={redo} disabled={future.length===0}/>
             <ToolbarButton icon={Save} label={saving ? 'Saving…' : 'Save'} onClick={saveAll}/>
             <ToolbarButton icon={Trash2} label="Reset data" variant="danger" onClick={resetAllData}/>
             <ToolbarButton icon={Download} label="Export JSON" onClick={exportProcess}/>

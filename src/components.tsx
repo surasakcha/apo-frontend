@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Upload, FileText } from 'lucide-react'
+import { Upload, FileText, Trash2 } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import type { ArtifactRow, ArtifactKind } from './db'
 
@@ -19,10 +19,19 @@ export function SectionTitle({ icon: Icon, title, right }: { icon: any; title: s
   )
 }
 
-export function ToolbarButton({ icon: Icon, label, onClick, variant='default' }: { icon:any; label:string; onClick?:()=>void; variant?:'default'|'ghost'|'danger' }) {
-  const base='inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm border transition'
-  const v = variant==='ghost' ? 'border-transparent hover:bg-slate-50 text-slate-600' : variant==='danger' ? 'border-red-200 text-red-700 hover:bg-red-50' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
-  return <button onClick={onClick} className={base+' '+v}><Icon className="w-4 h-4"/>{label}</button>
+export function ToolbarButton({ icon: Icon, label, onClick, variant='default', disabled=false }: { icon:any; label:string; onClick?:()=>void; variant?:'default'|'ghost'|'danger'; disabled?:boolean }) {
+  const base = 'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm border transition';
+  const v = variant==='ghost'
+    ? 'border-transparent hover:bg-slate-50 text-slate-600'
+    : variant==='danger'
+      ? 'border-red-200 text-red-700 hover:bg-red-50'
+      : 'border-slate-200 text-slate-700 hover:bg-slate-50';
+  const disabledCls = disabled ? ' opacity-50 cursor-not-allowed pointer-events-none' : '';
+  return (
+    <button onClick={onClick} className={base+' '+v+disabledCls} disabled={disabled}>
+      <Icon className="w-4 h-4"/>{label}
+    </button>
+  );
 }
 
 export function TextInput({ label, value, onChange, placeholder, required }: { label:string; value:string; onChange:(v:string)=>void; placeholder?:string; required?:boolean }) {
@@ -86,19 +95,90 @@ export function DropZone({ stepId, type, onFiles }: { stepId?:number; type:Artif
   )
 }
 
-export function ArtifactItem({ artifact, onRemove }: { artifact:ArtifactRow; onRemove:()=>void }) {
-  const [url, setUrl] = useState<string | undefined>(undefined)
-  useEffect(()=>{ if(artifact.blob){ const u=URL.createObjectURL(artifact.blob); setUrl(u); return ()=>URL.revokeObjectURL(u) } }, [artifact.id])
-  const isImage = artifact.mimeType?.startsWith('image/')
-  return (
-    <div className="flex items-center gap-2 rounded-xl border px-2 py-1">
-      {isImage && url ? <img src={url} alt={artifact.name} className="w-10 h-10 object-cover rounded"/> : <FileText className="w-6 h-6 text-slate-500"/>}
-      <div className="flex-1 text-xs">
-        <div className="font-medium text-slate-700 truncate max-w-[180px]" title={artifact.name}>{artifact.name}</div>
-        <div className="text-slate-500">{artifact.mimeType} · {humanFileSize(artifact.size||0)}</div>
-      </div>
-      <button onClick={onRemove} className="text-slate-500 hover:text-red-600">×</button>
-    </div>
-  )
+function extFrom(artifact: ArtifactRow) {
+  const byName = artifact.name?.split('.').pop();
+  if (byName && byName.length <= 5) return byName.toUpperCase();
+  const mime = artifact.mimeType?.split('/').pop();
+  return (mime || 'FILE').toUpperCase();
 }
+
+function badgeColor(ext: string) {
+  switch (ext) {
+    case 'PDF':
+      return 'bg-red-100 text-red-700';
+    case 'PNG':
+    case 'JPG':
+    case 'JPEG':
+    case 'GIF':
+      return 'bg-purple-100 text-purple-700';
+    case 'CSV':
+    case 'XLS':
+    case 'XLSX':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'DOC':
+    case 'DOCX':
+    case 'PPT':
+    case 'PPTX':
+      return 'bg-blue-100 text-blue-700';
+    case 'ZIP':
+    case 'RAR':
+      return 'bg-amber-100 text-amber-700';
+    case 'JSON':
+    case 'TXT':
+      return 'bg-slate-100 text-slate-700';
+    default:
+      return 'bg-slate-100 text-slate-700';
+  }
+}
+
+export function ArtifactItem({ artifact, onRemove }: { artifact:ArtifactRow; onRemove:()=>void }) {
+  const [url, setUrl] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (artifact.blob) {
+      const u = URL.createObjectURL(artifact.blob);
+      setUrl(u);
+      return () => URL.revokeObjectURL(u);
+    }
+  }, [artifact.id, artifact.blob]);
+
+  const isImage = artifact.mimeType?.startsWith('image/');
+  const ext = extFrom(artifact);
+
+  const handleRemove = () => {
+    const sizePart = artifact.size ? ` (${humanFileSize(artifact.size)})` : '';
+    if (confirm(`Delete "${artifact.name}"${sizePart}?`)) onRemove();
+  };
+
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-slate-200 px-2 py-1">
+      <div className="min-w-0 flex items-center gap-2">
+        {isImage && url ? (
+          <img src={url} alt={artifact.name} className="w-10 h-10 object-cover rounded" />
+        ) : (
+          <FileText className="w-6 h-6 text-slate-500" />
+        )}
+        <span
+          className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${badgeColor(ext)}`}
+          title={artifact.mimeType || ''}
+        >
+          {ext}
+        </span>
+        <div className="truncate text-xs font-medium text-slate-700 max-w-[180px]" title={artifact.name}>
+          {artifact.name}
+        </div>
+        <div className="ml-2 text-xs text-slate-500 shrink-0">
+          {humanFileSize(artifact.size || 0)}
+        </div>
+      </div>
+      <button
+        onClick={handleRemove}
+        title="Remove"
+        className="p-1 text-red-600 hover:text-red-700"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
 function humanFileSize(bytes:number){ if(bytes===0) return '0 B'; const k=1024; const sizes=['B','KB','MB','GB']; const i=Math.floor(Math.log(bytes)/Math.log(k)); return parseFloat((bytes/Math.pow(k,i)).toFixed(2))+' '+sizes[i] }
