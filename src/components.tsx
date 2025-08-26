@@ -68,6 +68,7 @@ export function ChipInput({ label, values, onChange, placeholder }: { label:stri
   const [input, setInput] = useState('')
   function addChip(v:string){ const t=v.trim(); if(!t) return; if(!values.includes(t)) onChange([...values,t]) }
   function addMany(parts:string[]){ for(const p of parts) addChip(p) }
+  const showPlaceholder = values.length === 0 && input.trim().length === 0;
   return (
     <div>
       <div className="text-xs text-slate-600 mb-1">{label}</div>
@@ -79,7 +80,7 @@ export function ChipInput({ label, values, onChange, placeholder }: { label:stri
           </span>
         ))}
         <input value={input} onChange={e=>{ const val=e.target.value; if(val.includes(',')){ const parts=val.split(','); const last=parts.pop()??''; addMany(parts); setInput(last) } else { setInput(val) } }}
-          placeholder={placeholder || 'Type and press Enter or comma'} onKeyDown={e=>{ if(e.key==='Enter'||e.key===','){ e.preventDefault(); addChip(input); setInput('') } }} className="min-w-[140px] flex-1 border-0 focus:outline-none text-sm"/>
+          placeholder={showPlaceholder ? (placeholder || 'Type and press Enter or comma') : ''} onKeyDown={e=>{ if(e.key==='Enter'||e.key===','){ e.preventDefault(); addChip(input); setInput('') } }} className="min-w-[140px] flex-1 border-0 focus:outline-none text-sm"/>
       </div>
     </div>
   )
